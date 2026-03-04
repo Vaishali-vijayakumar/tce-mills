@@ -240,6 +240,10 @@ router.get('/contracts', authenticateToken, async (req, res) => {
                     if (item.status === '⚠️ Payment Revision Required') {
                         return null;
                     }
+                    // Chairman should not see items that are still being processed by manager
+                    if (item.status === 'Pending CTL Entry' || item.status === 'Pending Lot Entry' || item.status === 'Pending Payment Entry' || item.status === 'Pending Quality Entry') {
+                        return null;
+                    }
                 }
 
                 return item;
@@ -283,14 +287,15 @@ router.get('/contracts', authenticateToken, async (req, res) => {
                 continue;
             }
 
-            // 2. For Stage 3+, Managers see the "Master" row ONLY if lots are not yet fully created (< 100%)
+            // 2. For Stage 3+, Managers/Chairman see the "Master" row ONLY if lots are not yet fully created
             const userRole = (req.user?.role || 'Manager').toLowerCase();
-            if (userRole === 'manager' || (userRole === 'chairman' && group.data.stage === 5)) {
+            const chairmanHasActiveApprovals = group.lots.some(l => l.status === 'Pending Chairman Approval');
+            if (userRole === 'manager' || (userRole === 'chairman' && (group.data.stage === 4 || group.data.stage === 5 || chairmanHasActiveApprovals))) {
                 // Debug comparison
                 console.log(`[DASHBOARD] Contract ${contract_id}: Arrived ${totalArrived} / ${group.data.quantity} | Show Master? ${totalArrived < parseInt(group.data.quantity)}`);
 
                 // If we have fulfilled the contract quantity with lots, don't show the master row anymore.
-                if (totalArrived < parseInt(group.data.quantity) || (userRole === 'chairman' && group.data.stage === 5)) {
+                if (totalArrived < parseInt(group.data.quantity) || (userRole === 'chairman' && (group.data.stage === 4 || group.data.stage === 5 || chairmanHasActiveApprovals))) {
                     if (group.master) {
                         pushWithTotal(group.master);
                     } else if (group.data.stage === 3 || group.lots.length > 0) {
