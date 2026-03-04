@@ -88,7 +88,7 @@ export default function Stage3_Sampling() {
         try {
             setLoading(true);
             const safeId = encodeURIComponent(id);
-            const res = await api.get(`/ contracts / ${safeId} `);
+            const res = await api.get(`/contracts/${safeId}`);
             setContract(res.data);
 
             // NAVIGATION GUARD
@@ -137,7 +137,7 @@ export default function Stage3_Sampling() {
         const year = date.getFullYear();
         let startYear = year;
         if (month < 3) startYear = year - 1;
-        return `/ ${startYear} -${startYear + 1} `;
+        return `/${startYear}-${startYear + 1}`;
     };
 
     const calculateEnd = (start, count) => {
@@ -167,7 +167,7 @@ export default function Stage3_Sampling() {
                 stage3_remarks: newLot.stage3_remarks
             }];
 
-            await api.post(`/ contracts / ${encodeURIComponent(id)}/stage3`, { lots: payload });
+            await api.post(`/contracts/${encodeURIComponent(id)}/stage3`, { lots: payload });
             setShowAddModal(false);
             fetchContractAndLots(); // Refresh list
 

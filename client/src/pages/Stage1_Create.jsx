@@ -85,9 +85,7 @@ export default function Stage1_Create() {
         const year = date.getFullYear();
         let startYear = year;
         if (month < 3) startYear = year - 1;
-        const s = startYear.toString().slice(-2);
-        const e = (startYear + 1).toString().slice(-2);
-        return `/${s}-${e}`;
+        return `/${startYear}-${startYear + 1}`;
     };
 
     const fetchLatestContractId = async () => {
