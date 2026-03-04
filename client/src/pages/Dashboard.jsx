@@ -143,18 +143,6 @@ export default function Dashboard() {
         }
     };
 
-    const getActionLabel = (c) => {
-        if (c.status.includes('Rejected')) return 'Resume';
-        if (c.status.includes('Revision') || c.status.includes('Modify')) return 'Revise';
-        if (c.stage === 6) return 'View Details';
-        if (c.stage === 1) return 'Approve';
-        if (c.stage === 2) return 'Quality';
-        if (c.stage === 3) return c.lot_id ? 'Manage Lot' : 'Lot Entry';
-        if (c.stage === 4) return 'CTL Entry';
-        if (c.stage === 5) return 'Payment';
-        return 'View';
-    };
-
     // Derived State
     const filteredContracts = contracts.filter(c => {
         // Search Filter
@@ -473,7 +461,7 @@ export default function Dashboard() {
                                                 onClick={() => handleAction(c)}
                                                 className="flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-indigo-600 rounded-md text-[9px] font-bold hover:bg-indigo-600 hover:text-white hover:border-transparent transition-all shadow-sm group-hover:border-indigo-200"
                                             >
-                                                <span>{getActionLabel(c)}</span>
+                                                <span>View</span>
                                                 <ArrowRight size={10} />
                                             </button>
                                         </div>
