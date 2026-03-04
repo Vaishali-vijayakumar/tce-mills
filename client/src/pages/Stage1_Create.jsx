@@ -387,19 +387,58 @@ export default function Stage1_Create() {
                                 </div>
                             )}
 
-                            {contract.stage1_params && (
-                                <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                                    <label className="block text-xs uppercase font-bold text-slate-500 mb-2">Additional Parameters</label>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        {Object.entries(JSON.parse(contract.stage1_params || '{}')).map(([key, val]) => (
-                                            <div key={key} className="flex flex-col">
-                                                <span className="text-xs text-slate-400 capitalize">{key.replace(/_/g, ' ')}</span>
-                                                <span className="font-medium text-slate-700">{val}</span>
-                                            </div>
-                                        ))}
+                            {contract.stage1_params && Object.values(
+                                typeof contract.stage1_params === 'string'
+                                    ? JSON.parse(contract.stage1_params)
+                                    : contract.stage1_params
+                            ).some(v => v !== '' && v !== null && v !== undefined) && (() => {
+                                const paramLabels = {
+                                    uhml: { label: 'UHML', unit: 'mm' },
+                                    gpt: { label: 'GPT', unit: '%' },
+                                    mic: { label: 'Micronaire', unit: '' },
+                                    sfi: { label: 'SFI', unit: '%' },
+                                    elongation: { label: 'Elongation', unit: '%' },
+                                    rd: { label: 'Rd (Brightness)', unit: '' },
+                                    plus_b: { label: '+b (Yellowness)', unit: '' },
+                                    mat: { label: 'Maturity', unit: '' },
+                                    sci: { label: 'SCI', unit: '' },
+                                    trash: { label: 'Trash', unit: '%' },
+                                    sfc_n: { label: 'SFC(n)', unit: '%' },
+                                    neps: { label: 'Neps', unit: '/g' },
+                                    moisture: { label: 'Moisture', unit: '%' },
+                                    ui: { label: 'Uniformity Index', unit: '%' },
+                                    grade: { label: 'Grade', unit: '' },
+                                    strength: { label: 'Strength', unit: 'g/tex' },
+                                    stability: { label: 'Stability', unit: '' },
+                                };
+                                const paramsObj = typeof contract.stage1_params === 'string'
+                                    ? JSON.parse(contract.stage1_params)
+                                    : contract.stage1_params;
+                                const filledParams = Object.entries(paramsObj).filter(([, v]) => v !== '' && v !== null && v !== undefined);
+                                return (
+                                    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 mt-2">
+                                        <label className="block text-xs uppercase font-bold text-indigo-600 mb-3 tracking-widest">
+                                            Internal Quality Parameters
+                                        </label>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                            {filledParams.map(([key, val]) => {
+                                                const meta = paramLabels[key] || { label: key.replace(/_/g, ' '), unit: '' };
+                                                return (
+                                                    <div key={key} className="bg-white rounded-lg p-3 border border-indigo-100 shadow-sm">
+                                                        <span className="block text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">
+                                                            {meta.label}
+                                                        </span>
+                                                        <span className="font-semibold text-slate-800 text-sm">
+                                                            {val}
+                                                            {meta.unit && <span className="text-slate-400 text-xs ml-1">{meta.unit}</span>}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
 
                         </div>
