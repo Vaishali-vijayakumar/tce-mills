@@ -80,16 +80,17 @@ export default function Stage4_CTL() {
             const res = await api.get(`/contracts/${safeId}`);
             setContract(res.data);
 
-            // NAVIGATION GUARD
-            const workflow = Boolean(res.data.is_privileged) ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
-            const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
-            const targetIdx = workflow.indexOf(4);
+            // NAVIGATION GUARD — skip for Chairman (they review all submissions)
+            if (user.role !== 'Chairman') {
+                const workflow = Boolean(res.data.is_privileged) ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
+                const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
 
-            if (currentIdx === -1 || currentIdx < workflow.indexOf(3)) {
-                const prevStage = Boolean(res.data.is_privileged) ? "Quality (Stage 2)" : "Lot Entry (Stage 3)";
-                alert(`This contract/lot is not yet ready for CTL Entry. Please complete ${prevStage} first.`);
-                navigate('/dashboard');
-                return;
+                if (currentIdx === -1 || currentIdx < workflow.indexOf(3)) {
+                    const prevStage = Boolean(res.data.is_privileged) ? "Quality (Stage 2)" : "Lot Entry (Stage 3)";
+                    alert(`This contract/lot is not yet ready for CTL Entry. Please complete ${prevStage} first.`);
+                    navigate('/dashboard');
+                    return;
+                }
             }
 
             // Find Active Lot
@@ -252,6 +253,9 @@ export default function Stage4_CTL() {
     // Navigation Enforcement
     useEffect(() => {
         if (!loading && contract) {
+            // Chairman can always view CTL pages — no redirect
+            if (user.role === 'Chairman') return;
+
             const isPrivileged = Boolean(contract.is_privileged);
             if (isPrivileged) {
                 // Privileged: Must have Stage 5 Approved
