@@ -245,24 +245,24 @@ export default function Dashboard() {
                 <h2 className="text-2xl font-semibold text-slate-900 mb-5">Dashboard Overview</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
-                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><FileText size={20} /></div>
+                        <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><FileText size={18} /></div>
                         <div>
-                            <p className="text-slate-400 text-[9px] font-semibold uppercase tracking-wider">Total</p>
-                            <p className="text-xl font-semibold text-slate-900">{stats.total}</p>
+                            <p className="text-slate-400 text-[8px] font-semibold uppercase tracking-wider">Total</p>
+                            <p className="text-lg font-semibold text-slate-900">{stats.total}</p>
                         </div>
                     </div>
-                    <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
-                        <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Clock size={20} /></div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+                        <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg"><Clock size={18} /></div>
                         <div>
-                            <p className="text-slate-400 text-[9px] font-semibold uppercase tracking-wider">Pending</p>
-                            <p className="text-xl font-semibold text-slate-900">{stats.pending}</p>
+                            <p className="text-slate-400 text-[8px] font-semibold uppercase tracking-wider">Pending</p>
+                            <p className="text-lg font-semibold text-slate-900">{stats.pending}</p>
                         </div>
                     </div>
-                    <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
-                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircle size={20} /></div>
+                    <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-3">
+                        <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircle size={18} /></div>
                         <div>
-                            <p className="text-slate-400 text-[9px] font-semibold uppercase tracking-wider">Completed</p>
-                            <p className="text-xl font-semibold text-slate-900">{stats.completed}</p>
+                            <p className="text-slate-400 text-[8px] font-semibold uppercase tracking-wider">Completed</p>
+                            <p className="text-lg font-semibold text-slate-900">{stats.completed}</p>
                         </div>
                     </div>
                 </div>
@@ -313,13 +313,13 @@ export default function Dashboard() {
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                 <table className="w-full text-left">
                     <thead>
-                        <tr className="bg-slate-50/50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
-                            <th className="px-6 py-4">Contract ID</th>
-                            <th className="px-6 py-4">Lot No</th>
-                            <th className="px-6 py-4">Vendor</th>
-                            <th className="px-6 py-4">GST No</th>
-                            <th className="px-6 py-4">Progress</th>
-                            <th className="px-6 py-4 text-right">Action</th>
+                        <tr className="bg-slate-50/50 border-b border-slate-200 text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
+                            <th className="px-4 py-3">Contract ID</th>
+                            <th className="px-4 py-3">Lot No</th>
+                            <th className="px-4 py-3">Vendor</th>
+                            <th className="px-4 py-3">GST No</th>
+                            <th className="px-4 py-3">Progress</th>
+                            <th className="px-4 py-3 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -342,25 +342,25 @@ export default function Dashboard() {
                                         ? 'bg-slate-50/60 hover:bg-indigo-50/30 border-l-2 border-l-indigo-100'
                                         : 'hover:bg-indigo-50/20'
                                         }`}>
-                                    <td className="px-6 py-3.5 font-mono font-semibold tracking-tight"><span className="text-indigo-600 text-base font-bold">{c.contract_id}</span></td>
-                                    <td className="px-6 py-3.5 font-mono text-slate-600 font-semibold text-xs text-center">
+                                    <td className="px-4 py-2 font-mono font-semibold tracking-tight"><span className="text-indigo-600 text-[13px] font-bold">{c.contract_id}</span></td>
+                                    <td className="px-4 py-2 font-mono text-slate-600 font-semibold text-[10px] text-center">
                                         {c.lot_id ? (
-                                            <span className="bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-md text-indigo-700 font-bold uppercase shadow-sm">
+                                            <span className="bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md text-indigo-700 font-bold uppercase shadow-sm">
                                                 {c.lot_number}
                                             </span>
                                         ) : (
                                             <span className="text-slate-400 font-bold">-</span>
                                         )}
                                     </td>
-                                    <td className="px-6 py-3.5 font-semibold text-slate-800 text-sm tracking-tight capitalize">
+                                    <td className="px-4 py-2">
                                         <div className="flex flex-col">
                                             <div className="flex items-center gap-1.5 min-w-0">
-                                                <span className="truncate">{c.vendor_name}</span>
-                                                {Boolean(c.is_privileged) && <Crown size={14} className="text-amber-500 fill-amber-500 shrink-0" title="Privileged Vendor" />}
+                                                <span className="text-[13px] font-bold text-slate-900 truncate max-w-[150px]" title={c.vendor_name}>{c.vendor_name}</span>
+                                                {Boolean(c.is_privileged) && <Crown size={12} className="text-amber-500 fill-amber-500 shrink-0" title="Privileged Vendor" />}
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-3.5 text-slate-400 font-mono text-xs">{c.gst_number || '-'}</td>
+                                    <td className="px-4 py-2 text-slate-400 font-mono text-[10px]">{c.gst_number || '-'}</td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center space-x-1">
                                             {(() => {
@@ -369,13 +369,13 @@ export default function Dashboard() {
                                                         { id: 1, label: 'Contract' },
                                                         { id: 2, label: 'Quality' },
                                                         { id: 5, label: 'Payment' },
-                                                        { id: 3, label: 'Lot' },
+                                                        { id: 3, label: 'Lot Entry' },
                                                         { id: 4, label: 'CTL' }
                                                     ]
                                                     : [
                                                         { id: 1, label: 'Contract' },
                                                         { id: 2, label: 'Quality' },
-                                                        { id: 3, label: 'Lot' },
+                                                        { id: 3, label: 'Lot Entry' },
                                                         { id: 4, label: 'CTL' },
                                                         { id: 5, label: 'Payment' }
                                                     ];
@@ -387,12 +387,8 @@ export default function Dashboard() {
                                                     if (currentStage === 6) {
                                                         isPast = true;
                                                     } else {
-                                                        // Get the index of the current stage in the active steps array
                                                         const currentOrderIdx = steps.findIndex(s => s.id === currentStage);
                                                         const stepOrderIdx = idx;
-
-                                                        // If we didn't find the current stage (shouldn't happen), assume it's past if stage number is greater?
-                                                        // No, better to be explicit.
                                                         if (currentOrderIdx === -1) {
                                                             isPast = currentStage > step.id;
                                                         } else {
@@ -413,7 +409,7 @@ export default function Dashboard() {
                                                             <button
                                                                 onClick={(e) => !isFuture && handleStageClick(e, c, step.id)}
                                                                 disabled={isFuture}
-                                                                className={`px-1.5 py-0.5 rounded-md text-[10px] tracking-wide ${boxClass} transition-all whitespace-nowrap ${!isFuture ? 'hover:opacity-80 hover:scale-105 active:scale-95 cursor-pointer' : ''}`}
+                                                                className={`px-1.5 py-0.5 rounded-md text-[9px] tracking-wide ${boxClass} transition-all whitespace-nowrap ${!isFuture ? 'hover:opacity-80 hover:scale-105 active:scale-95 cursor-pointer' : ''}`}
                                                                 title={isFuture ? 'Complete previous stages first' : `Go to ${step.label}`}
                                                             >
                                                                 {step.label.toLowerCase()}
@@ -431,29 +427,31 @@ export default function Dashboard() {
                                         </div>
                                         <div className="mt-1 flex items-center gap-2">
                                             {(c.status.includes('Rollback') || c.status.includes('Rejected') || c.status.includes('Revision') || c.status.includes('Modify')) && (
-                                                <span className="text-[10px] font-semibold text-rose-600 flex items-center gap-1">
+                                                <span className="text-[9px] font-semibold text-rose-600 flex items-center gap-1">
                                                     <AlertTriangle size={10} /> {c.status}
                                                 </span>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                        {c.status.includes('Rejected') && user?.role === 'Manager' && (
+                                    <td className="px-4 py-2 text-right">
+                                        <div className="flex justify-end items-center space-x-2">
+                                            {c.status.includes('Rejected') && user?.role === 'Manager' && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleResume(c); }}
+                                                    className="p-1 text-amber-600 hover:bg-amber-50 rounded-md transition-colors border border-amber-100 shadow-sm"
+                                                    title="Resume/Restart"
+                                                >
+                                                    <RotateCcw size={12} />
+                                                </button>
+                                            )}
                                             <button
-                                                onClick={() => handleResume(c)}
-                                                className="inline-flex items-center px-3 py-1.5 border border-emerald-100 text-xs font-semibold rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-600 hover:text-white transition-all shadow-sm group"
+                                                onClick={() => handleAction(c)}
+                                                className="flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-indigo-600 rounded-md text-[10px] font-bold hover:bg-indigo-600 hover:text-white hover:border-transparent transition-all shadow-sm group-hover:border-indigo-200"
                                             >
-                                                <RotateCcw size={14} className="mr-1.5 group-hover:-rotate-90 transition-transform" />
-                                                Resume
+                                                <span>View</span>
+                                                <ArrowRight size={10} />
                                             </button>
-                                        )}
-                                        <button
-                                            onClick={() => handleAction(c)}
-                                            className="inline-flex items-center px-3 py-1.5 border border-indigo-100 text-xs font-semibold rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-600 hover:text-white transition-all shadow-sm group"
-                                        >
-                                            View
-                                            <ArrowRight size={14} className="ml-1.5 group-hover:translate-x-0.5 transition-transform" />
-                                        </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))
