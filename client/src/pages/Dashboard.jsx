@@ -105,7 +105,7 @@ export default function Dashboard() {
         const lotPath = c.lot_id ? `/lots/${c.lot_id}` : '';
 
         // ENFORCEMENT: Block future stages
-        const steps = c.is_privileged === 1
+        const steps = Boolean(c.is_privileged)
             ? [1, 2, 5, 3, 4]
             : [1, 2, 3, 4, 5];
 
@@ -345,7 +345,7 @@ export default function Dashboard() {
                                     <td className="px-6 py-3.5 font-semibold text-slate-800 text-sm tracking-tight capitalize">
                                         <div className="flex flex-col">
                                             <span>{c.vendor_name}</span>
-                                            {c.is_privileged === 1 && (
+                                            {Boolean(c.is_privileged) && (
                                                 <span className="inline-flex items-center w-fit px-1.5 py-0.5 rounded-md text-xs font-bold bg-indigo-100 text-indigo-700 mt-1 uppercase tracking-tighter">
                                                     Privileged Vendor
                                                 </span>
@@ -356,7 +356,7 @@ export default function Dashboard() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center space-x-1">
                                             {(() => {
-                                                const steps = c.is_privileged === 1
+                                                const steps = Boolean(c.is_privileged)
                                                     ? [
                                                         { id: 1, label: 'Contract' },
                                                         { id: 2, label: 'Quality' },

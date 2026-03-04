@@ -92,7 +92,7 @@ export default function Stage3_Sampling() {
             setContract(res.data);
 
             // NAVIGATION GUARD
-            const workflow = res.data.is_privileged === 1 ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
+            const workflow = Boolean(res.data.is_privileged) ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
             const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
             const targetIdx = workflow.indexOf(3);
 
