@@ -680,7 +680,7 @@ router.post('/contracts/:id/payment', authenticateToken, async (req, res) => {
             if (!contract) throw new Error("Contract not found");
 
             const current = await determineStageStatus(contract, null);
-            if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
+            if (!isStageAllowed(Boolean(contract.is_privileged), current.stage, 5)) {
                 throw new Error(`Cannot enter Payment. Contract is currently at Stage ${current.stage}: ${current.status}`);
             }
 
@@ -759,7 +759,7 @@ router.post('/contracts/:id/lots/:lotId/stage5', authenticateToken, async (req, 
             if (!contract || !lot) throw new Error("Contract or Lot not found");
 
             const current = await determineStageStatus(contract, lot);
-            if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
+            if (!isStageAllowed(Boolean(contract.is_privileged), current.stage, 5)) {
                 throw new Error(`Cannot enter Payment. Lot is currently at Stage ${current.stage}: ${current.status}`);
             }
 

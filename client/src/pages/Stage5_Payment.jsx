@@ -127,7 +127,7 @@ export default function Stage5_Payment() {
             const targetIdx = workflow.indexOf(5);
 
             if (currentIdx === -1 || currentIdx < targetIdx) {
-                const prevStage = res.data.is_privileged === 1 ? "Quality (Stage 2)" : "CTL (Stage 4)";
+                const prevStage = Boolean(res.data.is_privileged) ? "Quality (Stage 2)" : "CTL (Stage 4)";
                 alert(`This contract/lot is not yet ready for Payment Entry. Please complete ${prevStage} approval first.`);
                 navigate('/dashboard');
                 return;
@@ -256,7 +256,7 @@ export default function Stage5_Payment() {
     // Navigation Enforcement
     useEffect(() => {
         if (!loading && contract) {
-            const isPrivileged = contract.is_privileged === 1;
+            const isPrivileged = Boolean(contract.is_privileged);
             if (isPrivileged) {
                 // Privileged: Must have Stage 2 Approved
                 if (contract.stage2Decision?.decision !== 'Approve') {
@@ -444,7 +444,7 @@ export default function Stage5_Payment() {
                     <div className="flex-grow">
                         {/* Preceding Remarks Section */}
                         {(() => {
-                            const isPrivileged = contract.is_privileged === 1;
+                            const isPrivileged = Boolean(contract.is_privileged);
                             const prevDecision = isPrivileged ? contract.stage2Decision : activeLot.s4Decision;
                             const stageLabel = isPrivileged ? "Quality Review" : `CTL Approval (Lot ${activeLot.lot_number})`;
 

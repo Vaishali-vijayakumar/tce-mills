@@ -71,11 +71,11 @@ export default function Vendors() {
                                 <tr><td colSpan="7" className="p-6 text-center text-slate-500">No vendors found.</td></tr>
                             ) : (
                                 vendors.map((vendor) => (
-                                    <tr key={vendor.vendor_id} className={`transition-colors ${vendor.is_privileged ? 'bg-amber-50 hover:bg-amber-100 border-l-4 border-l-amber-400' : 'hover:bg-indigo-50/50'}`}>
+                                    <tr key={vendor.vendor_id} className={`transition-colors ${Boolean(vendor.is_privileged) ? 'bg-amber-50 hover:bg-amber-100 border-l-4 border-l-amber-400' : 'hover:bg-indigo-50/50'}`}>
                                         <td className="p-4 font-mono text-indigo-600 font-semibold">#{vendor.vendor_id}</td>
                                         <td className="p-4 font-semibold text-slate-900 flex items-center gap-2">
                                             {vendor.vendor_name}
-                                            {vendor.is_privileged === 1 && <Crown size={16} className="text-amber-500 fill-amber-500" title="Privileged Vendor" />}
+                                            {Boolean(vendor.is_privileged) && <Crown size={16} className="text-amber-500 fill-amber-500" title="Privileged Vendor" />}
                                         </td>
                                         <td className="p-4">{vendor.gst_number}</td>
                                         <td className="p-4">{vendor.state}</td>

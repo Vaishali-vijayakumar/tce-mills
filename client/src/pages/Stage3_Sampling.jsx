@@ -97,7 +97,7 @@ export default function Stage3_Sampling() {
             const targetIdx = workflow.indexOf(3);
 
             if (currentIdx === -1 || currentIdx < targetIdx) {
-                const prevStage = res.data.is_privileged === 1 ? "Payment (Stage 5)" : "Quality (Stage 2)";
+                const prevStage = Boolean(res.data.is_privileged) ? "Payment (Stage 5)" : "Quality (Stage 2)";
                 alert(`This contract is not yet ready for Lot Entry. Please complete ${prevStage} approval first.`);
                 navigate('/dashboard');
                 return;
@@ -196,7 +196,7 @@ export default function Stage3_Sampling() {
                 return;
             }
 
-            const isPrivileged = contract.is_privileged === 1;
+            const isPrivileged = Boolean(contract.is_privileged);
             if (isPrivileged) {
                 // Privileged: Must have Stage 5 Approved
                 if (contract.stage5Decision?.decision !== 'Approve') {
@@ -322,7 +322,7 @@ export default function Stage3_Sampling() {
                         {/* Left Side: Chairman Instructions */}
                         <div className="flex-grow">
                             {(() => {
-                                const isPrivileged = contract.is_privileged === 1;
+                                const isPrivileged = Boolean(contract.is_privileged);
                                 const prevDecision = isPrivileged ? contract.stage5Decision : contract.stage2Decision;
                                 const stageLabel = isPrivileged ? "Payment Approval" : "Quality Review";
 

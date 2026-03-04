@@ -10,7 +10,10 @@ import {
     ChevronRight,
     ArrowRight,
     Filter,
-    MoreHorizontal
+    MoreHorizontal,
+    Crown,
+    AlertTriangle,
+    RotateCcw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -349,12 +352,10 @@ export default function Dashboard() {
                                     </td>
                                     <td className="px-6 py-3.5 font-semibold text-slate-800 text-sm tracking-tight capitalize">
                                         <div className="flex flex-col">
-                                            <span>{c.vendor_name}</span>
-                                            {Boolean(c.is_privileged) && (
-                                                <span className="inline-flex items-center w-fit px-1.5 py-0.5 rounded-md text-xs font-bold bg-indigo-100 text-indigo-700 mt-1 uppercase tracking-tighter">
-                                                    Privileged Vendor
-                                                </span>
-                                            )}
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className="truncate">{c.vendor_name}</span>
+                                                {Boolean(c.is_privileged) && <Crown size={14} className="text-amber-500 fill-amber-500 shrink-0" title="Privileged Vendor" />}
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-3.5 text-slate-400 font-mono text-xs">{c.gst_number || '-'}</td>

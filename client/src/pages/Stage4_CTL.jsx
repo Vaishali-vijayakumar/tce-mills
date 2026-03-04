@@ -251,7 +251,7 @@ export default function Stage4_CTL() {
     // Navigation Enforcement
     useEffect(() => {
         if (!loading && contract) {
-            const isPrivileged = contract.is_privileged === 1;
+            const isPrivileged = Boolean(contract.is_privileged);
             if (isPrivileged) {
                 // Privileged: Must have Stage 5 Approved
                 if (contract.stage5Decision?.decision !== 'Approve') {
@@ -369,7 +369,7 @@ export default function Stage4_CTL() {
                         <div className="space-y-6 flex-grow">
                             {/* Previous Remarks Section for Chairman */}
                             {(() => {
-                                const isPrivileged = contract.is_privileged === 1;
+                                const isPrivileged = Boolean(contract.is_privileged);
                                 const prevDecision = isPrivileged ? contract.stage5Decision : contract.stage2Decision;
                                 const stageLabel = isPrivileged ? "Payment Audit" : "Quality Review";
 
@@ -576,7 +576,7 @@ export default function Stage4_CTL() {
 
             {/* Previous Chairman Remarks */}
             {(() => {
-                const isPrivileged = contract.is_privileged === 1;
+                const isPrivileged = Boolean(contract.is_privileged);
                 const prevDecision = isPrivileged ? contract.stage5Decision : contract.stage2Decision;
                 const stageLabel = isPrivileged ? "Payment Audit" : "Quality Review";
 
