@@ -281,14 +281,21 @@ router.get('/contracts', authenticateToken, async (req, res) => {
                 finalResults.push({ ...row, total_bales_arrived: totalArrived });
             };
 
+            const userRole = (req.user?.role || 'Manager').toLowerCase();
+
             // 1. For Stage 1 or 2, just add the master row
             if (group.data.stage < 3) {
                 if (group.master) pushWithTotal(group.master);
+                // For Chairman, still check if any lots have CTL pending approval even if contract is at stage 1/2
+                if (userRole === 'chairman') {
+                    group.lots.forEach(lot => {
+                        if ((lot.status || '').includes('Pending Chairman Approval')) pushWithTotal(lot);
+                    });
+                }
                 continue;
             }
 
             // 2. For Stage 3+, Managers/Chairman see the "Master" row ONLY if lots are not yet fully created
-            const userRole = (req.user?.role || 'Manager').toLowerCase();
             const chairmanHasActiveApprovals = group.lots.some(l => l.status === 'Pending Chairman Approval');
             if (userRole === 'manager' || (userRole === 'chairman' && (group.data.stage === 4 || group.data.stage === 5 || chairmanHasActiveApprovals))) {
                 // Debug comparison
