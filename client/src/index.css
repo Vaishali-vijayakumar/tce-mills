@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        font-size: 17px;
+        /* Comfortable middle ground */
+    }
+
+    body {
+        @apply text-slate-900 antialiased;
+        font-size: 1rem;
+        letter-spacing: -0.01em;
+    }
+
+    /* Make form elements legible and clickable but not oversized */
+    input,
+    select,
+    textarea,
+    button {
+        font-size: 1rem !important;
+        min-height: 2.75rem;
+    }
+
+    label {
+        font-size: 0.875rem !important;
+        font-weight: 700 !important;
+        margin-bottom: 0.4rem !important;
+        display: block;
+        color: #1e293b !important;
+    }
+
+    /* Tables */
+    th {
+        font-size: 0.8rem !important;
+        letter-spacing: 0.025em !important;
+    }
+
+    td {
+        font-size: 1rem !important;
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+    }
+
+    h1,
+    h2,
+    h3 {
+        letter-spacing: -0.02em;
+        color: #0f172a !important;
+        /* Slate-900 */
+    }
+
+    /* Focus states - Very visible for keyboard/seniors */
+    *:focus {
+        outline: 4px solid #4f46e5 !important;
+        outline-offset: 2px;
+    }
+
+    /* Increase contrast for gray text */
+    .text-slate-400,
+    .text-slate-500 {
+        color: #475569 !important;
+        /* Bump up to Slate-600 equivalent */
+    }
+
+    .text-slate-600 {
+        color: #1e293b !important;
+        /* Bump up to Slate-800 */
+    }
+}
+
+/* Custom Scrollbar for better visibility */
+::-webkit-scrollbar {
+    width: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 6px;
+    border: 3px solid #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
