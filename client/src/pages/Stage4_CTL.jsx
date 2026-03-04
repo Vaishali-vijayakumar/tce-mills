@@ -81,7 +81,11 @@ export default function Stage4_CTL() {
             setContract(res.data);
 
             // NAVIGATION GUARD
-            if (res.data.stage < 4) {
+            const workflow = res.data.is_privileged === 1 ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
+            const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
+            const targetIdx = workflow.indexOf(4);
+
+            if (currentIdx === -1 || currentIdx < targetIdx) {
                 alert("This lot is not yet ready for CTL Entry. Please complete Lot Entry (Stage 3) first.");
                 navigate('/dashboard');
                 return;

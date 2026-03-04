@@ -63,7 +63,11 @@ export default function Stage2_Quality() {
             setContract(res.data);
 
             // NAVIGATION GUARD
-            if (res.data.stage < 2) {
+            const workflow = res.data.is_privileged === 1 ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
+            const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
+            const targetIdx = workflow.indexOf(2);
+
+            if (currentIdx === -1 || currentIdx < targetIdx) {
                 alert("This contract is not yet ready for Quality Entry. Please complete Stage 1 Chairman approval first.");
                 navigate('/dashboard');
                 return;

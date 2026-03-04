@@ -122,7 +122,11 @@ export default function Stage5_Payment() {
             setContract(res.data);
 
             // NAVIGATION GUARD
-            if (res.data.stage < 5) {
+            const workflow = res.data.is_privileged === 1 ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
+            const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
+            const targetIdx = workflow.indexOf(5);
+
+            if (currentIdx === -1 || currentIdx < targetIdx) {
                 const prevStage = res.data.is_privileged === 1 ? "Quality (Stage 2)" : "CTL (Stage 4)";
                 alert(`This contract/lot is not yet ready for Payment Entry. Please complete ${prevStage} approval first.`);
                 navigate('/dashboard');

@@ -92,7 +92,11 @@ export default function Stage3_Sampling() {
             setContract(res.data);
 
             // NAVIGATION GUARD
-            if (res.data.stage < 3) {
+            const workflow = res.data.is_privileged === 1 ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
+            const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
+            const targetIdx = workflow.indexOf(3);
+
+            if (currentIdx === -1 || currentIdx < targetIdx) {
                 const prevStage = res.data.is_privileged === 1 ? "Payment (Stage 5)" : "Quality (Stage 2)";
                 alert(`This contract is not yet ready for Lot Entry. Please complete ${prevStage} approval first.`);
                 navigate('/dashboard');

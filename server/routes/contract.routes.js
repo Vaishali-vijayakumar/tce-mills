@@ -85,6 +85,29 @@ router.get('/check-sequence', authenticateToken, async (req, res) => {
 // --- Helper: Determine Stage & Status ---
 // Privileged vendors: Contract(1) → Quality(2) → Payment(5, contract-level) → Lot(3) → CTL(4)
 // Standard vendors:   Contract(1) → Quality(2) → Lot(3) → CTL(4) → Payment(5, lot-level)
+
+const getWorkflow = (isPrivileged) => {
+    return isPrivileged ? [1, 2, 5, 3, 4] : [1, 2, 3, 4, 5];
+};
+
+const isStageAllowed = (isPrivileged, currentStage, targetStage) => {
+    if (currentStage === 6) return true; // Final stage allows viewing all
+    const workflow = getWorkflow(isPrivileged);
+    const currentIdx = workflow.indexOf(currentStage);
+    const targetIdx = workflow.indexOf(targetStage);
+
+    // If target stage is not in workflow at all (e.g. Stage 6 or invalid)
+    if (targetIdx === -1) return true;
+
+    // Index check: Current index must be at or after Target index
+    return currentIdx >= targetIdx;
+};
+
+const getStageIndex = (isPrivileged, stage) => {
+    const workflow = getWorkflow(isPrivileged);
+    return workflow.indexOf(stage);
+};
+
 const determineStageStatus = async (contract, lot) => {
     const vendor = await get("SELECT is_privileged FROM vendors WHERE vendor_id = (SELECT vendor_id FROM contracts WHERE contract_id = ?)", [contract.contract_id]);
     const isPrivileged = vendor && vendor.is_privileged;
@@ -464,8 +487,8 @@ router.post('/contracts/:id/stage2', authenticateToken, async (req, res) => {
         const contract = await get("SELECT * FROM contracts WHERE contract_id = ?", [id]);
         if (!contract) return res.status(404).json({ error: "Contract not found" });
         const current = await determineStageStatus(contract, null);
-        if (current.stage < 2) {
-            return res.status(400).json({ error: `Cannot enter Quality. Contract is currently at Stage ${current.stage}: ${current.status}` });
+        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 2)) {
+            return res.status(400).json({ error: `Cannot enter Quality Report. Contract is currently at Stage ${current.stage}: ${current.status || 'Locked'}` });
         }
 
         await run(`INSERT INTO stage2_manager_report 
@@ -520,7 +543,7 @@ router.post('/contracts/:id/stage3', authenticateToken, async (req, res) => {
         const contract = await get("SELECT * FROM contracts WHERE contract_id = ?", [id]);
         if (!contract) return res.status(404).json({ error: "Contract not found" });
         const current = await determineStageStatus(contract, null);
-        if (current.stage < 3) {
+        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 3)) {
             return res.status(400).json({ error: `Cannot enter Lots. Contract is currently at Stage ${current.stage}: ${current.status}` });
         }
 
@@ -606,7 +629,7 @@ router.post('/contracts/:id/lots/:lotId/stage4', authenticateToken, async (req, 
         if (!contract || !lot) return res.status(404).json({ error: "Contract or Lot not found" });
 
         const current = await determineStageStatus(contract, lot);
-        if (current.stage < 4) {
+        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 4)) {
             return res.status(400).json({ error: `Cannot enter CTL results. Lot is currently at Stage ${current.stage}: ${current.status}` });
         }
 
@@ -658,7 +681,7 @@ router.post('/contracts/:id/payment', authenticateToken, async (req, res) => {
         const contract = await get("SELECT * FROM contracts WHERE contract_id = ?", [id]);
         if (!contract) return res.status(404).json({ error: "Contract not found" });
         const current = await determineStageStatus(contract, null);
-        if (current.stage < 5) {
+        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
             return res.status(400).json({ error: `Cannot enter Payment. Contract is currently at Stage ${current.stage}: ${current.status}` });
         }
 
@@ -729,7 +752,7 @@ router.post('/contracts/:id/lots/:lotId/stage5', authenticateToken, async (req, 
         if (!contract || !lot) return res.status(404).json({ error: "Contract or Lot not found" });
 
         const current = await determineStageStatus(contract, lot);
-        if (current.stage < 5) {
+        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
             return res.status(400).json({ error: `Cannot enter Payment. Lot is currently at Stage ${current.stage}: ${current.status}` });
         }
 
