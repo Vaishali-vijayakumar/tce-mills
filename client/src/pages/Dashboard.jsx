@@ -27,27 +27,32 @@ export default function Dashboard() {
         fetchContracts();
 
         // REAL-TIME SUBSCRIPTION
-        const channel = supabase
-            .channel('db-changes')
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'contracts' },
-                () => fetchContracts()
-            )
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'contract_lots' },
-                () => fetchContracts()
-            )
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'lot_decisions' },
-                () => fetchContracts()
-            )
-            .subscribe();
+        let channel = null;
+        if (supabase) {
+            channel = supabase
+                .channel('db-changes')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'contracts' },
+                    () => fetchContracts()
+                )
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'contract_lots' },
+                    () => fetchContracts()
+                )
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'lot_decisions' },
+                    () => fetchContracts()
+                )
+                .subscribe();
+        }
 
         return () => {
-            supabase.removeChannel(channel);
+            if (supabase && channel) {
+                supabase.removeChannel(channel);
+            }
         };
     }, []);
 
