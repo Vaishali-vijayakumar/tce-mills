@@ -80,7 +80,7 @@ export default function Dashboard() {
 
     const handleAction = (c) => {
         // If Lot ID is present, use Lot-Specific Routes for Stage 4/5
-        const safeLotId = c.lot_id ? encodeURIComponent(c.lot_id.split('/').join('---')) : '';
+        const safeLotId = c.lot_id ? encodeURIComponent(String(c.lot_id).split('/').join('---')) : '';
         const lotPath = c.lot_id ? `/lots/${safeLotId}` : ''; // Part of URL
 
         // Replace slashes with --- for robust URL segments on hosted environments
@@ -111,7 +111,7 @@ export default function Dashboard() {
     const handleStageClick = (e, c, stepId) => {
         e.stopPropagation();
         const safeContractId = encodeURIComponent(c.contract_id.split('/').join('---'));
-        const safeLotId = c.lot_id ? encodeURIComponent(c.lot_id.split('/').join('---')) : '';
+        const safeLotId = c.lot_id ? encodeURIComponent(String(c.lot_id).split('/').join('---')) : '';
         const lotPath = c.lot_id ? `/lots/${safeLotId}` : '';
 
         // ENFORCEMENT: Block future stages
