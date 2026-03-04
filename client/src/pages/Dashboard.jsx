@@ -119,12 +119,18 @@ export default function Dashboard() {
             ? [1, 2, 5, 3, 4]
             : [1, 2, 3, 4, 5];
 
-        const currentStageIdx = steps.indexOf(c.stage === 6 ? 6 : c.stage);
+        const currentStageValue = c.stage === 6 ? 6 : c.stage;
+        const currentStageIdx = steps.indexOf(currentStageValue);
         const targetStageIdx = steps.indexOf(stepId);
 
-        if (targetStageIdx > currentStageIdx && c.stage !== 6) {
-            // Future stage - do nothing or show toast (optional)
-            return;
+        if (targetStageIdx > currentStageIdx && currentStageValue !== 6) {
+            // Relaxed for CTL/Payment from Stage 3 onwards
+            const stage3Idx = steps.indexOf(3);
+            if (currentStageIdx >= stage3Idx && (stepId === 4 || stepId === 5)) {
+                // Allow specific jumps
+            } else {
+                return;
+            }
         }
 
         switch (stepId) {
@@ -135,6 +141,18 @@ export default function Dashboard() {
             case 5: navigate(`/contracts/${safeContractId}${lotPath}/stage5`); break;
             default: break;
         }
+    };
+
+    const getActionLabel = (c) => {
+        if (c.status.includes('Rejected')) return 'Resume';
+        if (c.status.includes('Revision') || c.status.includes('Modify')) return 'Revise';
+        if (c.stage === 6) return 'View Details';
+        if (c.stage === 1) return 'Approve';
+        if (c.stage === 2) return 'Quality';
+        if (c.stage === 3) return c.lot_id ? 'Manage Lot' : 'Lot Entry';
+        if (c.stage === 4) return 'CTL Entry';
+        if (c.stage === 5) return 'Payment';
+        return 'View';
     };
 
     // Derived State
@@ -397,7 +415,14 @@ export default function Dashboard() {
                                                     }
 
                                                     const isCurrent = step.id === currentStage;
-                                                    const isFuture = !isPast && !isCurrent;
+                                                    let isFuture = !isPast && !isCurrent;
+
+                                                    // Relax: CTL/Payment not future if at Stage 3+
+                                                    if (isFuture && (step.id === 4 || step.id === 5)) {
+                                                        const s3Idx = steps.findIndex(s => s.id === 3);
+                                                        const curIdx = steps.findIndex(s => s.id === (currentStage === 6 ? 6 : currentStage));
+                                                        if (curIdx >= s3Idx) isFuture = false;
+                                                    }
 
                                                     let boxClass = 'border border-slate-200 bg-white text-slate-400';
                                                     if (isPast) boxClass = 'border border-emerald-200 bg-emerald-50 text-emerald-600';
@@ -446,9 +471,9 @@ export default function Dashboard() {
                                             )}
                                             <button
                                                 onClick={() => handleAction(c)}
-                                                className="flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-indigo-600 rounded-md text-[10px] font-bold hover:bg-indigo-600 hover:text-white hover:border-transparent transition-all shadow-sm group-hover:border-indigo-200"
+                                                className="flex items-center space-x-1 px-2.5 py-1 bg-white border border-slate-200 text-indigo-600 rounded-md text-[9px] font-bold hover:bg-indigo-600 hover:text-white hover:border-transparent transition-all shadow-sm group-hover:border-indigo-200"
                                             >
-                                                <span>View</span>
+                                                <span>{getActionLabel(c)}</span>
                                                 <ArrowRight size={10} />
                                             </button>
                                         </div>
