@@ -91,8 +91,8 @@ const determineStageStatus = async (contract, lot) => {
 
     // STAGE 1: Chairman approves contract
     const s1 = await get("SELECT * FROM stage1_chairman_decision WHERE contract_id = ?", [contract.contract_id]);
-    if (!s1 || s1.decision.toLowerCase() !== 'approve') {
-        if (s1 && s1.decision.toLowerCase() === 'reject') return { stage: 1, status: "Stage 1 Rejected" };
+    if (!s1 || s1.decision !== 'Approve') {
+        if (s1 && s1.decision === 'Reject') return { stage: 1, status: "Stage 1 Rejected" };
         return { stage: 1, status: "Pending Chairman Approval" };
     }
 
@@ -166,7 +166,7 @@ const determineStageStatus = async (contract, lot) => {
 // Get Latest Contract ID
 router.get('/contracts/latest-id', authenticateToken, async (req, res) => {
     try {
-        const result = await get("SELECT contract_id FROM contracts ORDER BY rowid DESC LIMIT 1");
+        const result = await get("SELECT contract_id FROM contracts ORDER BY created_at DESC LIMIT 1");
         res.json({ latest_contract_id: result ? result.contract_id : null });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -414,15 +414,15 @@ router.post('/contracts', authenticateToken, async (req, res) => {
         console.error('Contract creation error:', e);
 
         // Handle specific database errors gracefully
-        if (e.message && e.message.includes('UNIQUE constraint failed') && e.message.includes('contract_id')) {
+        if (e.message && (e.message.includes('UNIQUE constraint failed') || e.message.includes('duplicate key value violates unique constraint')) && e.message.includes('contract')) {
             return res.status(400).json({ error: "Contract ID already exists. Please use a different contract ID." });
         }
 
-        if (e.message && e.message.includes('NOT NULL constraint failed')) {
+        if (e.message && (e.message.includes('NOT NULL constraint failed') || e.message.includes('null value in column'))) {
             return res.status(400).json({ error: "Missing required fields. Please fill all mandatory fields." });
         }
 
-        if (e.message && e.message.includes('FOREIGN KEY constraint failed')) {
+        if (e.message && (e.message.includes('FOREIGN KEY constraint failed') || e.message.includes('violates foreign key constraint'))) {
             return res.status(400).json({ error: "Invalid vendor selected." });
         }
 
@@ -634,7 +634,8 @@ router.post('/contracts/:id/lots/:lotId/stage4/decision', authenticateToken, asy
 
     try {
         await run(`INSERT INTO lot_decisions (lot_id, stage_number, decision, remarks, decided_by, decision_date) 
-            VALUES (?, 4, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            VALUES (?, 4, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (lot_id, stage_number) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
             [lotId, decision, remarks, req.user.user_id]);
 
         await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -773,7 +774,8 @@ router.post('/contracts/:id/lots/:lotId/stage5/decision', authenticateToken, asy
 
     try {
         await run(`INSERT INTO lot_decisions (lot_id, stage_number, decision, remarks, decided_by, decision_date) 
-            VALUES (?, 5, ?, ?, ?, CURRENT_TIMESTAMP)`,
+            VALUES (?, 5, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (lot_id, stage_number) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
             [lotId, decision, remarks, req.user.user_id]);
 
         await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,

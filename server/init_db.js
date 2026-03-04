@@ -167,7 +167,8 @@ const initDb = async () => {
             decision TEXT,
             remarks TEXT,
             decided_by INTEGER REFERENCES users(user_id),
-            decision_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            decision_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (lot_id, stage_number)
         )`,
 
         `CREATE TABLE IF NOT EXISTS stage_history (

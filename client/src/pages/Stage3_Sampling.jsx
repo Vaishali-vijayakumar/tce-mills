@@ -185,6 +185,13 @@ export default function Stage3_Sampling() {
     // Navigation Enforcement
     useEffect(() => {
         if (!loading && contract) {
+            // Chairman has no role in Stage 3 (Lot Entry) — redirect to dashboard
+            if (user.role === 'Chairman') {
+                console.log("Access Denied: Chairman cannot access Lot Entry (Stage 3)");
+                navigate('/dashboard');
+                return;
+            }
+
             const isPrivileged = contract.is_privileged === 1;
             if (isPrivileged) {
                 // Privileged: Must have Stage 5 Approved
@@ -200,7 +207,7 @@ export default function Stage3_Sampling() {
                 }
             }
         }
-    }, [loading, contract, navigate]);
+    }, [loading, contract, navigate, user.role]);
 
     if (loading) return <div className="p-10 text-center text-slate-500">Loading Contract Data...</div>;
     if (!contract) return <div className="p-10 text-center text-red-500">Contract not found</div>;
