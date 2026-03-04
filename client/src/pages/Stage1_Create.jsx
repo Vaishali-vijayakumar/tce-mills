@@ -169,7 +169,6 @@ export default function Stage1_Create() {
             });
             if (data.stage1_params) {
                 setParams(data.stage1_params);
-                setShowParams(true);
             }
         } catch (e) { console.error(e); }
     };
@@ -221,7 +220,15 @@ export default function Stage1_Create() {
         setSubmitError('');
         try {
             const contract_id = `${formData.contract_prefix}${getFinancialYearSuffix(formData.entry_date)}`;
-            const payload = { ...formData, contract_id, params: showParams ? params : null, manager_remarks: formData.manager_remarks };
+
+            // Check if any parameters were filled
+            const hasAnyParams = Object.values(params).some(v => v !== '' && v !== null && v !== undefined);
+            const payload = {
+                ...formData,
+                contract_id,
+                params: hasAnyParams ? params : null,
+                manager_remarks: formData.manager_remarks
+            };
 
             const response = await api.post('/contracts', payload);
             navigate('/dashboard');
@@ -245,7 +252,7 @@ export default function Stage1_Create() {
 
     const paramFields = [
         'uhml', 'gpt', 'mic', 'sfi', 'elongation', 'rd', 'plus_b', 'mat',
-        'sci', 'trash', 'sfc_n', 'neps', 'moisture', 'ui', 'grade', 'strength', 'stability'
+        'sci', 'trash', 'sfc_n', 'neps', 'moisture', 'ui', 'grade', 'colour_grade', 'strength', 'stability'
     ];
 
     const handleSubmitChairman = async (decision) => {
@@ -408,6 +415,7 @@ export default function Stage1_Create() {
                                     moisture: { label: 'Moisture', unit: '%' },
                                     ui: { label: 'Uniformity Index', unit: '%' },
                                     grade: { label: 'Grade', unit: '' },
+                                    colour_grade: { label: 'Colour Grade', unit: '' },
                                     strength: { label: 'Strength', unit: 'g/tex' },
                                     stability: { label: 'Stability', unit: '' },
                                 };
