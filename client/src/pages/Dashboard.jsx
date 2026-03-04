@@ -1,8 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../api';
-import { useNavigate } from 'react-router-dom';
-import { FileText, Clock, CheckCircle, AlertTriangle, ArrowRight, Search, Edit3, ChevronRight, Layers, RotateCcw } from 'lucide-react';
+import { supabase } from '../supabase';
 import { useAuth } from '../context/AuthContext';
+import {
+    FileText,
+    Search,
+    Clock,
+    CheckCircle,
+    ChevronRight,
+    ArrowRight,
+    Filter,
+    MoreHorizontal
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Dashboard() {
     const { user } = useAuth();
@@ -15,6 +25,30 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchContracts();
+
+        // REAL-TIME SUBSCRIPTION
+        const channel = supabase
+            .channel('db-changes')
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'contracts' },
+                () => fetchContracts()
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'contract_lots' },
+                () => fetchContracts()
+            )
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'lot_decisions' },
+                () => fetchContracts()
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const fetchContracts = async () => {

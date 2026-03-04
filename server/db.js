@@ -80,6 +80,41 @@ const get = async (text, params = []) => {
     }
 };
 
+/**
+ * Execute multiple queries within a single transaction
+ */
+const withTransaction = async (callback) => {
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const result = await callback({
+            query: async (text, params = []) => {
+                const sql = transformQuery(text);
+                const res = await client.query(sql, params);
+                return res.rows;
+            },
+            run: async (text, params = []) => {
+                const sql = transformQuery(text);
+                const res = await client.query(sql, params);
+                return { changes: res.rowCount, lastID: null, rows: res.rows };
+            },
+            get: async (text, params = []) => {
+                const sql = transformQuery(text);
+                const res = await client.query(sql, params);
+                return res.rows[0];
+            }
+        });
+        await client.query('COMMIT');
+        return result;
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('❌ Transaction Error:', err.message);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
 // Compatibility wrapper for graceful shutdown
 const db_pool = {
     end: () => pool.end()
@@ -89,6 +124,7 @@ module.exports = {
     query,
     run,
     get,
+    withTransaction,
     pool: db_pool,
     rawPool: pool
 };

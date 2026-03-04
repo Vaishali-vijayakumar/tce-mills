@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { run, query, get } = require('../db');
+const { query, run, get, withTransaction } = require('../db');
 const { authenticateToken } = require('../middleware/auth.middleware');
 
 // --- Helper: Get Financial Year Suffix ---
@@ -457,18 +457,22 @@ router.post('/contracts', authenticateToken, async (req, res) => {
 router.post('/contracts/:id/stage1/decision', authenticateToken, async (req, res) => {
     if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
     const { id } = req.params;
-    const { decision, remarks } = req.body; // Approve / Reject
+    const { decision, remarks } = req.body;
 
     try {
-        await run(`INSERT INTO stage1_chairman_decision (contract_id, decision, remarks, decided_by, decision_date) 
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT (contract_id) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
-            [id, decision, remarks, req.user.user_id]);
+        await withTransaction(async (tx) => {
+            // LOCK the contract row
+            const contract = await tx.get("SELECT contract_id FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+            if (!contract) throw new Error("Contract not found");
 
-        await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
-            [id, 1, decision, req.user.user_id, remarks]);
+            await tx.run(`INSERT INTO stage1_chairman_decision (contract_id, decision, remarks, decided_by, decision_date) 
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (contract_id) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
+                [id, decision, remarks, req.user.user_id]);
 
-        // REMOVED: Auto-create lot for privileged vendor. Now they must manually add lots in Stage 3.
+            await tx.run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
+                [id, 1, decision, req.user.user_id, remarks]);
+        });
 
         res.json({ message: "Stage 1 Decision Saved" });
     } catch (e) {
@@ -483,25 +487,28 @@ router.post('/contracts/:id/stage2', authenticateToken, async (req, res) => {
     const { report_date, report_document_path, uhml, ui, strength, elongation, mic, rd, plus_b, remarks } = req.body;
 
     try {
-        // ENFORCEMENT: Check Stage Sequence
-        const contract = await get("SELECT * FROM contracts WHERE contract_id = ?", [id]);
-        if (!contract) return res.status(404).json({ error: "Contract not found" });
-        const current = await determineStageStatus(contract, null);
-        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 2)) {
-            return res.status(400).json({ error: `Cannot enter Quality Report. Contract is currently at Stage ${current.stage}: ${current.status || 'Locked'}` });
-        }
+        await withTransaction(async (tx) => {
+            // ENFORCEMENT: Check Stage Sequence
+            const contract = await tx.get("SELECT * FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+            if (!contract) throw new Error("Contract not found");
 
-        await run(`INSERT INTO stage2_manager_report 
-            (contract_id, report_date, report_document_path, uhml, ui, strength, elongation, mic, rd, plus_b, entered_by, remarks, uploaded_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT (contract_id) DO UPDATE SET
-            report_date=excluded.report_date, report_document_path=excluded.report_document_path,
-            uhml=excluded.uhml, ui=excluded.ui, strength=excluded.strength, elongation=excluded.elongation, mic=excluded.mic,
-            rd=excluded.rd, plus_b=excluded.plus_b, entered_by=excluded.entered_by, remarks=excluded.remarks, uploaded_at=CURRENT_TIMESTAMP`,
-            [id, report_date, report_document_path, toNum(uhml), toNum(ui), toNum(strength), toNum(elongation), toNum(mic), toNum(rd), toNum(plus_b), req.user.user_id, remarks]);
+            const current = await determineStageStatus(contract, null);
+            if (!isStageAllowed(contract.is_privileged === 1, current.stage, 2)) {
+                throw new Error(`Cannot enter Quality Report. Contract is currently at Stage ${current.stage}: ${current.status || 'Locked'}`);
+            }
 
-        await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
-            [id, 2, 'Quality Entry', req.user.user_id, 'Manager entered quality reports (Averages)']);
+            await tx.run(`INSERT INTO stage2_manager_report 
+                (contract_id, report_date, report_document_path, uhml, ui, strength, elongation, mic, rd, plus_b, entered_by, remarks, uploaded_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (contract_id) DO UPDATE SET
+                report_date=excluded.report_date, report_document_path=excluded.report_document_path,
+                uhml=excluded.uhml, ui=excluded.ui, strength=excluded.strength, elongation=excluded.elongation, mic=excluded.mic,
+                rd=excluded.rd, plus_b=excluded.plus_b, entered_by=excluded.entered_by, remarks=excluded.remarks, uploaded_at=CURRENT_TIMESTAMP`,
+                [id, report_date, report_document_path, toNum(uhml), toNum(ui), toNum(strength), toNum(elongation), toNum(mic), toNum(rd), toNum(plus_b), req.user.user_id, remarks]);
+
+            await tx.run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
+                [id, 2, 'Quality Entry', req.user.user_id, 'Quality report entered by manager']);
+        });
 
         res.json({ message: "Stage 2 Data Saved" });
     } catch (e) {
@@ -513,17 +520,22 @@ router.post('/contracts/:id/stage2', authenticateToken, async (req, res) => {
 router.post('/contracts/:id/stage2/decision', authenticateToken, async (req, res) => {
     if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
     const { id } = req.params;
-    const { decision, remarks } = req.body; // Approve / Reject
+    const { decision, remarks } = req.body;
 
     try {
-        await run(`INSERT INTO stage2_chairman_decision (contract_id, decision, remarks, decided_by, decision_date) 
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT (contract_id) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
-            [id, decision, remarks, req.user.user_id]);
+        await withTransaction(async (tx) => {
+            // LOCK the contract row
+            const contract = await tx.get("SELECT contract_id FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+            if (!contract) throw new Error("Contract not found");
 
-        await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
-            [id, 2, decision, req.user.user_id, remarks]);
+            await tx.run(`INSERT INTO stage2_chairman_decision (contract_id, decision, remarks, decided_by, decision_date)
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (contract_id) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
+                [id, decision, remarks, req.user.user_id]);
 
+            await tx.run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
+                [id, 2, decision, req.user.user_id, remarks]);
+        });
         res.json({ message: "Stage 2 Decision Saved" });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -555,294 +567,294 @@ router.post('/contracts/:id/stage3', authenticateToken, async (req, res) => {
 
         for (const lot of lots) {
             const newBales = parseInt(lot.no_of_bales) || 0;
-            const newSamples = parseInt(lot.no_of_samples) || 0;
+            await withTransaction(async (tx) => {
+                // ENFORCEMENT: Check Stage Sequence + Fetch contract for quantity validation
+                const contract = await tx.get("SELECT * FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+                if (!contract) throw new Error("Contract not found");
+                const current = await determineStageStatus(contract, null);
+                if (!isStageAllowed(contract.is_privileged === 1, current.stage, 3)) {
+                    throw new Error(`Cannot enter Lots. Contract is currently at Stage ${current.stage}: ${current.status}`);
+                }
 
-            if (lot.lot_id) {
-                // Update: Subtract old value, add new value
-                const oldLot = existingLots.find(l => l.lot_id == lot.lot_id);
-                const oldBales = oldLot ? (oldLot.no_of_bales || 0) : 0;
-                incomingTotalChange += (newBales - oldBales);
-            } else {
-                // Insert: Add new value
-                incomingTotalChange += newBales;
-            }
-        }
+                // VALIDATION: Check Total Quantity
+                const existingLots = await tx.query("SELECT lot_id, no_of_bales FROM contract_lots WHERE contract_id = ?", [id]);
+                let currentTotal = existingLots.reduce((sum, lot) => sum + (lot.no_of_bales || 0), 0);
+                let incomingTotalChange = 0;
 
-        if (currentTotal + incomingTotalChange > contract.quantity) {
-            return res.status(400).json({
-                error: `Total bales (${currentTotal + incomingTotalChange}) exceeds contract quantity (${contract.quantity}). Remaining: ${contract.quantity - currentTotal}`
+                for (const lot of lots) {
+                    const newBales = parseInt(lot.no_of_bales) || 0;
+                    if (lot.lot_id) {
+                        const oldLot = existingLots.find(l => l.lot_id == lot.lot_id);
+                        const oldBales = oldLot ? (oldLot.no_of_bales || 0) : 0;
+                        incomingTotalChange += (newBales - oldBales);
+                    } else {
+                        incomingTotalChange += newBales;
+                    }
+                }
+
+                if (currentTotal + incomingTotalChange > contract.quantity) {
+                    throw new Error(`Total bales (${currentTotal + incomingTotalChange}) exceeds contract quantity (${contract.quantity}). Remaining: ${contract.quantity - currentTotal}`);
+                }
+
+                for (const lot of lots) {
+                    let { lot_number, arrival_date, sequence_start, no_of_samples, no_of_bales, stage3_remarks } = lot;
+                    let sequence_end = lot.sequence_end;
+                    if (!sequence_end && sequence_start && no_of_samples) {
+                        sequence_end = parseInt(sequence_start) + parseInt(no_of_samples) - 1;
+                    }
+
+                    if (lot.lot_id) {
+                        await tx.run(`UPDATE contract_lots SET 
+                        lot_number=?, arrival_date=?, sequence_start=?, sequence_end=?, no_of_samples=?, no_of_bales=?, stage3_remarks=?
+                        WHERE lot_id=? AND contract_id=?`,
+                            [lot_number, arrival_date, sequence_start, sequence_end, toNum(no_of_samples), toNum(no_of_bales), stage3_remarks, lot.lot_id, id]);
+                    } else {
+                        await tx.run(`INSERT INTO contract_lots (contract_id, lot_number, arrival_date, sequence_start, sequence_end, no_of_samples, no_of_bales, stage3_remarks) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    });
+
+            // STAGE 4: CTS Entry (Manager) - Per Lot
+            router.post('/contracts/:id/lots/:lotId/stage4', authenticateToken, async (req, res) => {
+                if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
+                const { id, lotId } = req.params;
+                const {
+                    mic_value, strength, uhml, ui_percent, sfi, elongation, rd, plus_b, colour_grade, mat, sci, trash_percent, moisture_percent,
+                    test_date, confirmation_date, remarks, report_document_path, trash_percent_samples
+                } = req.body;
+
+                try {
+                    await withTransaction(async (tx) => {
+                        // LOCK the contract row
+                        const contract = await tx.get("SELECT * FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+                        const lot = await tx.get("SELECT * FROM contract_lots WHERE lot_id = ? AND contract_id = ?", [lotId, id]);
+                        if (!contract || !lot) throw new Error("Contract or Lot not found");
+
+                        const current = await determineStageStatus(contract, lot);
+                        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 4)) {
+                            throw new Error(`Cannot enter CTL results. Lot is currently at Stage ${current.stage}: ${current.status}`);
+                        }
+
+                        await tx.run(`UPDATE contract_lots SET 
+                mic_value=?, strength=?, uhml=?, ui_percent=?, sfi=?, elongation=?, rd=?, plus_b=?, colour_grade=?, mat=?, sci=?, trash_percent=?, moisture_percent=?,
+                test_date=?, confirmation_date=?, stage4_remarks=?, report_document_path=?, trash_percent_samples=?
+                WHERE lot_id=? AND contract_id=?`,
+                            [toNum(mic_value), toNum(strength), toNum(uhml), toNum(ui_percent), toNum(sfi), toNum(elongation), toNum(rd), toNum(plus_b), colour_grade, toNum(mat), toNum(sci), toNum(trash_percent), toNum(moisture_percent),
+                                test_date, confirmation_date, remarks, report_document_path, trash_percent_samples, lotId, id]);
+
+                        await tx.run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
+                            [id, lotId, 4, 'CTS Entry', req.user.user_id, 'CTS results entered for Lot']);
+                    });
+
+                    res.json({ message: "Stage 4 Data Saved" });
+                } catch (e) {
+                    res.status(500).json({ error: e.message });
+                }
             });
-        }
 
-        for (const lot of lots) {
-            // Determine Sequence End (Backend Calc optional or trust frontend)
-            // Frontend sends it? Let's check. Yes.
-            // Auto-calc end if needed? 
-            let { lot_number, arrival_date, sequence_start, no_of_samples, no_of_bales, stage3_remarks } = lot;
+            // STAGE 4: Chairman Decision (Per Lot)
+            router.post('/contracts/:id/lots/:lotId/stage4/decision', authenticateToken, async (req, res) => {
+                if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
+                const { id, lotId } = req.params;
+                const { decision, remarks } = req.body;
 
-            // Calculate Sequence End (Simple implementation assuming numeric)
-            // If seq start is "101", and count 50 -> "150". 
-            // Note: Frontend appends financial year. We store raw start/end usually, or formatted?
-            // Previous code stored raw strings. Let's trust frontend or recalculate.
-            // For simplicity, let's assume frontend sends correct data or rely on simple logic if missing.
-            let sequence_end = lot.sequence_end;
-            if (!sequence_end && sequence_start && no_of_samples) {
-                sequence_end = parseInt(sequence_start) + parseInt(no_of_samples) - 1;
-            }
-
-            if (lot.lot_id) {
-                // Update
-                await run(`UPDATE contract_lots SET 
-                    lot_number=?, arrival_date=?, sequence_start=?, sequence_end=?, no_of_samples=?, no_of_bales=?, stage3_remarks=?
-                    WHERE lot_id=? AND contract_id=?`,
-                    [lot_number, arrival_date, sequence_start, sequence_end, toNum(no_of_samples), toNum(no_of_bales), stage3_remarks, lot.lot_id, id]);
-            } else {
-                // Insert
-                await run(`INSERT INTO contract_lots (contract_id, lot_number, arrival_date, sequence_start, sequence_end, no_of_samples, no_of_bales, stage3_remarks) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                    [id, lot_number, arrival_date, sequence_start, sequence_end, toNum(no_of_samples), toNum(no_of_bales), stage3_remarks]);
-            }
-        }
-
-        await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
-            [id, 3, 'Lot Entry', req.user.user_id, `Lot Entry: ${lots.length} lots processed`]);
-
-        res.json({ message: "Stage 3 Data Saved" });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// STAGE 4: CTS Entry (Manager) - Per Lot
-router.post('/contracts/:id/lots/:lotId/stage4', authenticateToken, async (req, res) => {
-    if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
-    const { id, lotId } = req.params;
-    const {
-        mic_value, strength, uhml, ui_percent, sfi, elongation, rd, plus_b, colour_grade, mat, sci, trash_percent, moisture_percent,
-        test_date, confirmation_date, remarks, report_document_path, trash_percent_samples
-    } = req.body;
-
-    try {
-        // ENFORCEMENT: Check Stage Sequence
-        const contract = await get("SELECT * FROM contracts WHERE contract_id = ?", [id]);
-        const lot = await get("SELECT * FROM contract_lots WHERE lot_id = ? AND contract_id = ?", [lotId, id]);
-        if (!contract || !lot) return res.status(404).json({ error: "Contract or Lot not found" });
-
-        const current = await determineStageStatus(contract, lot);
-        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 4)) {
-            return res.status(400).json({ error: `Cannot enter CTL results. Lot is currently at Stage ${current.stage}: ${current.status}` });
-        }
-
-        await run(`UPDATE contract_lots SET 
-            mic_value=?, strength=?, uhml=?, ui_percent=?, sfi=?, elongation=?, rd=?, plus_b=?, colour_grade=?, mat=?, sci=?, trash_percent=?, moisture_percent=?,
-            test_date=?, confirmation_date=?, stage4_remarks=?, report_document_path=?, trash_percent_samples=?
-            WHERE lot_id=? AND contract_id=?`,
-            [toNum(mic_value), toNum(strength), toNum(uhml), toNum(ui_percent), toNum(sfi), toNum(elongation), toNum(rd), toNum(plus_b), colour_grade, toNum(mat), toNum(sci), toNum(trash_percent), toNum(moisture_percent),
-                test_date, confirmation_date, remarks, report_document_path, trash_percent_samples, lotId, id]);
-
-        await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, lotId, 4, 'CTS Entry', req.user.user_id, 'CTS results entered for Lot']);
-
-        res.json({ message: "Stage 4 Data Saved" });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// STAGE 4: Chairman Decision (Per Lot)
-router.post('/contracts/:id/lots/:lotId/stage4/decision', authenticateToken, async (req, res) => {
-    if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
-    const { id, lotId } = req.params;
-    const { decision, remarks } = req.body;
-
-    try {
-        await run(`INSERT INTO lot_decisions (lot_id, stage_number, decision, remarks, decided_by, decision_date) 
+                try {
+                    await run(`INSERT INTO lot_decisions (lot_id, stage_number, decision, remarks, decided_by, decision_date) 
             VALUES (?, 4, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT (lot_id, stage_number) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
-            [lotId, decision, remarks, req.user.user_id]);
+                        [lotId, decision, remarks, req.user.user_id]);
 
-        await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, lotId, 4, decision, req.user.user_id, remarks]);
+                    await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
+                        [id, lotId, 4, decision, req.user.user_id, remarks]);
 
-        res.json({ message: "Stage 4 Decision Saved" });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
+                    res.json({ message: "Stage 4 Decision Saved" });
+                } catch (e) {
+                    res.status(500).json({ error: e.message });
+                }
+            });
 
-// STAGE 5: Contract-Level Payment Entry (Manager) - for Privileged Vendors
-router.post('/contracts/:id/payment', authenticateToken, async (req, res) => {
-    if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
-    const { id } = req.params;
-    const { invoice_value, tds_amount, cash_discount, net_amount_paid, bank_name, branch, account_no, ifsc_code, payment_mode, rtgs_reference_no, remarks, invoice_number, invoice_weight } = req.body;
+            // STAGE 5: Contract-Level Payment Entry (Manager) - for Privileged Vendors
+            router.post('/contracts/:id/payment', authenticateToken, async (req, res) => {
+                if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
+                const { id } = req.params;
+                const { invoice_value, tds_amount, cash_discount, net_amount_paid, bank_name, branch, account_no, ifsc_code, payment_mode, rtgs_reference_no, remarks, invoice_number, invoice_weight } = req.body;
 
-    try {
-        // ENFORCEMENT: Check Stage Sequence (Privileged Only)
-        const contract = await get("SELECT * FROM contracts WHERE contract_id = ?", [id]);
-        if (!contract) return res.status(404).json({ error: "Contract not found" });
-        const current = await determineStageStatus(contract, null);
-        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
-            return res.status(400).json({ error: `Cannot enter Payment. Contract is currently at Stage ${current.stage}: ${current.status}` });
-        }
+                try {
+                    await withTransaction(async (tx) => {
+                        // ENFORCEMENT: Check Stage Sequence (Privileged Only)
+                        const contract = await tx.get("SELECT * FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+                        if (!contract) throw new Error("Contract not found");
 
-        await run(`UPDATE contracts SET 
-            invoice_value=?, tds_amount=?, cash_discount=?, net_amount_paid=?, bank_name=?, branch=?, account_no=?, ifsc_code=?, payment_mode=?, rtgs_reference_no=?, invoice_number=?, invoice_weight=?, supplied_to=?, stage5_remarks=?
-            WHERE contract_id=?`,
-            [
-                invoice_value || 0,
-                tds_amount || 0,
-                cash_discount || 0,
-                net_amount_paid || 0,
-                bank_name || '',
-                branch || '',
-                account_no || '',
-                ifsc_code || '',
-                payment_mode || 'RTGS',
-                rtgs_reference_no || '',
-                invoice_number || '',
-                invoice_weight || null,
-                req.body.supplied_to || '',
-                remarks || '',
-                id
-            ]);
+                        const current = await determineStageStatus(contract, null);
+                        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
+                            throw new Error(`Cannot enter Payment. Contract is currently at Stage ${current.stage}: ${current.status}`);
+                        }
 
-        await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
-            [id, 5, 'Payment Entry', req.user.user_id, 'Contract-level payment requisition entered']);
+                        await tx.run(`UPDATE contracts SET 
+                invoice_value=?, tds_amount=?, cash_discount=?, net_amount_paid=?, bank_name=?, branch=?, account_no=?, ifsc_code=?, payment_mode=?, rtgs_reference_no=?, invoice_number=?, invoice_weight=?, supplied_to=?, stage5_remarks=?
+                WHERE contract_id=?`,
+                            [
+                                invoice_value || 0,
+                                tds_amount || 0,
+                                cash_discount || 0,
+                                net_amount_paid || 0,
+                                bank_name || '',
+                                branch || '',
+                                account_no || '',
+                                ifsc_code || '',
+                                payment_mode || 'RTGS',
+                                rtgs_reference_no || '',
+                                invoice_number || '',
+                                invoice_weight || null,
+                                req.body.supplied_to || '',
+                                remarks || '',
+                                id
+                            ]);
 
-        // Reset Decision if Rollback happened
-        await run("DELETE FROM contract_payment_decision WHERE contract_id = ?", [id]);
+                        await tx.run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
+                            [id, 5, 'Payment Entry', req.user.user_id, 'Contract-level payment requisition entered']);
 
-        res.json({ message: "Contract Payment Data Saved" });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
+                        // Reset Decision if Rollback happened
+                        await tx.run("DELETE FROM contract_payment_decision WHERE contract_id = ?", [id]);
+                    });
 
-// STAGE 5: Chairman Contract-Level Payment Decision
-router.post('/contracts/:id/payment/decision', authenticateToken, async (req, res) => {
-    if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
-    const { id } = req.params;
-    const { decision, remarks } = req.body;
+                    res.json({ message: "Contract Payment Data Saved" });
+                } catch (e) {
+                    res.status(500).json({ error: e.message });
+                }
+            });
 
-    try {
-        await run(`INSERT INTO contract_payment_decision (contract_id, decision, remarks, decided_by, decision_date) 
-            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT (contract_id) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
-            [id, decision, remarks, req.user.user_id]);
+            // STAGE 5: Chairman Contract-Level Payment Decision
+            router.post('/contracts/:id/payment/decision', authenticateToken, async (req, res) => {
+                if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
+                const { id } = req.params;
+                const { decision, remarks } = req.body;
 
-        await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
-            [id, 5, decision, req.user.user_id, remarks]);
+                try {
+                    await withTransaction(async (tx) => {
+                        // LOCK contract row
+                        const contract = await tx.get("SELECT contract_id FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+                        if (!contract) throw new Error("Contract not found");
 
-        res.json({ message: "Contract Payment Decision Saved" });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
+                        await tx.run(`INSERT INTO contract_payment_decision (contract_id, decision, remarks, decided_by, decision_date) 
+                VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT (contract_id) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
+                            [id, decision, remarks, req.user.user_id]);
 
-// STAGE 5: Payment Entry (Manager) - Per Lot
-router.post('/contracts/:id/lots/:lotId/stage5', authenticateToken, async (req, res) => {
-    if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
-    const { id, lotId } = req.params;
-    const { invoice_value, tds_amount, cash_discount, net_amount_paid, bank_name, branch, account_no, ifsc_code, payment_mode, rtgs_reference_no, remarks } = req.body;
+                        await tx.run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
+                            [id, 5, decision, req.user.user_id, remarks]);
+                    });
 
-    try {
-        // ENFORCEMENT: Check Stage Sequence (Normal Only)
-        const contract = await get("SELECT * FROM contracts WHERE contract_id = ?", [id]);
-        const lot = await get("SELECT * FROM contract_lots WHERE lot_id = ? AND contract_id = ?", [lotId, id]);
-        if (!contract || !lot) return res.status(404).json({ error: "Contract or Lot not found" });
+                    res.json({ message: "Contract Payment Decision Saved" });
+                } catch (e) {
+                    res.status(500).json({ error: e.message });
+                }
+            });
 
-        const current = await determineStageStatus(contract, lot);
-        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
-            return res.status(400).json({ error: `Cannot enter Payment. Lot is currently at Stage ${current.stage}: ${current.status}` });
-        }
+            // STAGE 5: Payment Entry (Manager) - Per Lot
+            router.post('/contracts/:id/lots/:lotId/stage5', authenticateToken, async (req, res) => {
+                if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
+                const { id, lotId } = req.params;
+                const { invoice_value, tds_amount, cash_discount, net_amount_paid, bank_name, branch, account_no, ifsc_code, payment_mode, rtgs_reference_no, remarks } = req.body;
 
-        await run(`UPDATE contract_lots SET 
-            invoice_value=?, tds_amount=?, cash_discount=?, net_amount_paid=?, bank_name=?, branch=?, account_no=?, ifsc_code=?, payment_mode=?, rtgs_reference_no=?, invoice_number=?, invoice_weight=?, supplied_to=?, stage5_remarks=?
-            WHERE lot_id=? AND contract_id=?`,
-            [
-                invoice_value || 0,
-                tds_amount || 0,
-                cash_discount || 0,
-                net_amount_paid || 0,
-                bank_name || '',
-                branch || '',
-                account_no || '',
-                ifsc_code || '',
-                payment_mode || 'RTGS',
-                rtgs_reference_no || '',
-                req.body.invoice_number || '',
-                req.body.invoice_weight || null,
-                req.body.supplied_to || '',
-                remarks || '',
-                lotId, id
-            ]);
+                try {
+                    await withTransaction(async (tx) => {
+                        // ENFORCEMENT: Check Stage Sequence (Normal Only)
+                        const contract = await tx.get("SELECT * FROM contracts WHERE contract_id = ? FOR UPDATE", [id]);
+                        const lot = await tx.get("SELECT * FROM contract_lots WHERE lot_id = ? AND contract_id = ?", [lotId, id]);
+                        if (!contract || !lot) throw new Error("Contract or Lot not found");
 
-        await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, lotId, 5, 'Payment Entry', req.user.user_id, 'Payment requisition entered for Lot']);
+                        const current = await determineStageStatus(contract, lot);
+                        if (!isStageAllowed(contract.is_privileged === 1, current.stage, 5)) {
+                            throw new Error(`Cannot enter Payment. Lot is currently at Stage ${current.stage}: ${current.status}`);
+                        }
 
-        // Reset Decision if Rollback happened
-        await run("DELETE FROM lot_decisions WHERE lot_id = ? AND stage_number = 5", [lotId]);
+                        await tx.run(`UPDATE contract_lots SET 
+                invoice_value=?, tds_amount=?, cash_discount=?, net_amount_paid=?, bank_name=?, branch=?, account_no=?, ifsc_code=?, payment_mode=?, rtgs_reference_no=?, invoice_number=?, invoice_weight=?, supplied_to=?, stage5_remarks=?
+                WHERE lot_id=? AND contract_id=?`,
+                            [
+                                invoice_value || 0,
+                                tds_amount || 0,
+                                cash_discount || 0,
+                                net_amount_paid || 0,
+                                bank_name || '',
+                                branch || '',
+                                account_no || '',
+                                ifsc_code || '',
+                                payment_mode || 'RTGS',
+                                rtgs_reference_no || '',
+                                req.body.invoice_number || '',
+                                req.body.invoice_weight || null,
+                                req.body.supplied_to || '',
+                                remarks || '',
+                                lotId, id
+                            ]);
 
-        res.json({ message: "Stage 5 Data Saved" });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
+                        await tx.run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
+                            [id, lotId, 5, 'Payment Entry', req.user.user_id, 'Payment requisition entered for Lot']);
 
-// STAGE 5: Chairman Decision (Per Lot)
-router.post('/contracts/:id/lots/:lotId/stage5/decision', authenticateToken, async (req, res) => {
-    if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
-    const { id, lotId } = req.params;
-    const { decision, remarks } = req.body;
+                        // Reset Decision if Rollback happened
+                        await tx.run("DELETE FROM lot_decisions WHERE lot_id = ? AND stage_number = 5", [lotId]);
+                    });
+                    res.json({ message: "Stage 5 Data Saved" });
+                } catch (e) {
+                    res.status(500).json({ error: e.message });
+                }
+            });
 
-    try {
-        await run(`INSERT INTO lot_decisions (lot_id, stage_number, decision, remarks, decided_by, decision_date) 
+            // STAGE 5: Chairman Decision (Per Lot)
+            router.post('/contracts/:id/lots/:lotId/stage5/decision', authenticateToken, async (req, res) => {
+                if (req.user.role.toLowerCase() !== 'chairman') return res.status(403).json({ message: "Chairman only" });
+                const { id, lotId } = req.params;
+                const { decision, remarks } = req.body;
+
+                try {
+                    await run(`INSERT INTO lot_decisions (lot_id, stage_number, decision, remarks, decided_by, decision_date) 
             VALUES (?, 5, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT (lot_id, stage_number) DO UPDATE SET decision=excluded.decision, remarks=excluded.remarks, decided_by=excluded.decided_by, decision_date=CURRENT_TIMESTAMP`,
-            [lotId, decision, remarks, req.user.user_id]);
+                        [lotId, decision, remarks, req.user.user_id]);
 
-        await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
-            [id, lotId, 5, decision, req.user.user_id, remarks]);
+                    await run(`INSERT INTO stage_history (contract_id, lot_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?, ?)`,
+                        [id, lotId, 5, decision, req.user.user_id, remarks]);
 
-        res.json({ message: "Stage 5 Decision Saved" });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
+                    res.json({ message: "Stage 5 Decision Saved" });
+                } catch (e) {
+                    res.status(500).json({ error: e.message });
+                }
+            });
 
-// RESUME CONTRACT (Restart from Stage 2 if rejected)
-router.post('/contracts/:id/resume', authenticateToken, async (req, res) => {
-    if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
-    const { id } = req.params;
+            // RESUME CONTRACT (Restart from Stage 2 if rejected)
+            router.post('/contracts/:id/resume', authenticateToken, async (req, res) => {
+                if (req.user.role.toLowerCase() !== 'manager') return res.status(403).json({ message: "Manager only" });
+                const { id } = req.params;
 
-    try {
-        // 1. Force Stage 1 to 'Approve' to allow entry into Stage 2
-        await run(`
+                try {
+                    // 1. Force Stage 1 to 'Approve' to allow entry into Stage 2
+                    await run(`
             INSERT INTO stage1_chairman_decision (contract_id, decision, remarks, decision_date)
             VALUES (?, 'Approve', 'Resumed by Manager from rejection', CURRENT_TIMESTAMP)
             ON CONFLICT (contract_id) DO UPDATE SET decision='Approve', remarks='Resumed by Manager from rejection', decision_date=CURRENT_TIMESTAMP
         `, [id]);
 
-        // 2. Clear all downstream data & decisions
-        await run("DELETE FROM stage2_chairman_decision WHERE contract_id = ?", [id]);
-        await run("DELETE FROM stage2_manager_report WHERE contract_id = ?", [id]);
+                    // 2. Clear all downstream data & decisions
+                    await run("DELETE FROM stage2_chairman_decision WHERE contract_id = ?", [id]);
+                    await run("DELETE FROM stage2_manager_report WHERE contract_id = ?", [id]);
 
-        // Get all lot IDs for this contract to clear their decisions
-        const lots = await query("SELECT lot_id FROM contract_lots WHERE contract_id = ?", [id]);
-        for (const lot of lots) {
-            await run("DELETE FROM lot_decisions WHERE lot_id = ?", [lot.lot_id]);
-        }
-        await run("DELETE FROM contract_lots WHERE contract_id = ?", [id]);
+                    // Get all lot IDs for this contract to clear their decisions
+                    const lots = await query("SELECT lot_id FROM contract_lots WHERE contract_id = ?", [id]);
+                    for (const lot of lots) {
+                        await run("DELETE FROM lot_decisions WHERE lot_id = ?", [lot.lot_id]);
+                    }
+                    await run("DELETE FROM contract_lots WHERE contract_id = ?", [id]);
 
-        // 3. Log history
-        await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
-            [id, 2, 'Resumed', req.user.user_id, 'Contract resumed from rejection to Stage 2']);
+                    // 3. Log history
+                    await run(`INSERT INTO stage_history (contract_id, stage_number, action, performed_by, remarks) VALUES (?, ?, ?, ?, ?)`,
+                        [id, 2, 'Resumed', req.user.user_id, 'Contract resumed from rejection to Stage 2']);
 
-        res.json({ message: "Contract resumed to Stage 2" });
-    } catch (e) {
-        console.error('[RESUME_ERROR]', e);
-        res.status(500).json({ error: e.message });
-    }
-});
+                    res.json({ message: "Contract resumed to Stage 2" });
+                } catch (e) {
+                    console.error('[RESUME_ERROR]', e);
+                    res.status(500).json({ error: e.message });
+                }
+            });
 
-module.exports = router;
+            module.exports = router;
