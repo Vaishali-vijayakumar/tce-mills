@@ -17,7 +17,7 @@ export default function Stage5_Payment() {
     };
 
     const id = safeDecode(params.id);
-    const lotId = params.lotId;
+    const lotId = safeDecode(params.lotId);
 
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -39,8 +39,8 @@ export default function Stage5_Payment() {
 
     // Auto-Fit Logic
     const containerRef = useRef(null);
-    const [scale, setScale] = useState(0.55); // Slightly smaller default for the grid view
-    const [fitMode, setFitMode] = useState('page');
+    const [scale, setScale] = useState(0.85); // Default to 85% as requested
+    const [fitMode, setFitMode] = useState('manual');
 
     // Zoom Handlers
     const handleZoomIn = () => {

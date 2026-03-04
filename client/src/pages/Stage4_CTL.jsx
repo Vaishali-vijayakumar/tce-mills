@@ -32,7 +32,7 @@ export default function Stage4_CTL() {
         }
     };
     const id = safeDecode(params.id);
-    const lotId = params.lotId;
+    const lotId = safeDecode(params.lotId);
 
     const navigate = useNavigate();
     const { user } = useAuth();
