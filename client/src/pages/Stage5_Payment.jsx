@@ -126,7 +126,7 @@ export default function Stage5_Payment() {
             const currentIdx = workflow.indexOf(res.data.stage === 6 ? 6 : res.data.stage);
             const targetIdx = workflow.indexOf(5);
 
-            if (currentIdx === -1 || currentIdx < workflow.indexOf(3)) {
+            if (currentIdx === -1 || currentIdx < targetIdx) {
                 const prevStage = Boolean(res.data.is_privileged) ? "Quality (Stage 2)" : "Lot Entry (Stage 3)";
                 alert(`This contract/lot is not yet ready for Payment Entry. Please complete ${prevStage} first.`);
                 navigate('/dashboard');
